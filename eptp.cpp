@@ -21,12 +21,55 @@ struct Usuario {
     vector<vector<int>> c;
 };
 
+struct Individuo {
+    int aptitud;
+    vector<int> cromosoma;
+};
+
+struct Poblacion {
+    vector<Individuo> poblacion;
+    vector<int> mejorCromosoma;
+    int mejorAptitud;
+};
+
 void printArray(vector<vector<int>> arr, int n, int m){
     for (int i=0;i<n;i++){
         for (int j=0;j<m;j++){
             cout<<arr[i][j]<< " ";
         }
         cout<<endl;
+    }
+}
+
+int eval(Individuo ind, Instancia ins, Usuario us, int gen){
+    int curr;
+    int next;
+    int val = 0;
+    int t = 0;
+    bool factibilidad = true;
+    int pen = max(gen/50,10)*1500+1000;
+    for (int i=0;i<(ind.cromosoma.size()-1);i++){
+        curr = ind.cromosoma[i];
+        next = ind.cromosoma[i+1];
+        t += ins.adj[curr][next];
+        if (t<ins.td[next][0]){
+            t = ins.td[next][0];
+        }
+        if ((t+ins.t[next])>ins.td[next][1]){
+            factibilidad = false;
+            break;
+        }
+        val = val + us.s[next] + us.c[curr][next];
+        t += ins.t[next];
+        if (t>us.T){
+            factibilidad = false;
+            break;
+        }
+    }
+    if (factibilidad) {
+        return val;
+    } else {
+        return val - pen;
     }
 }
 
