@@ -77,7 +77,7 @@ int eval(Individuo ind, Instancia ins, Usuario us, int gen){
     vector<int> tour = ind.cromosoma;
     tour.push_back(0);
     tour.insert(tour.begin(),0);
-    for (int i=0;i<(tour.size()-1);i++){
+    for (int i=0;i<(int)(tour.size()-1);i++){
         curr = tour[i];
         next = tour[i+1];
         t += ins.adj[curr][next];
@@ -140,7 +140,7 @@ int tiempoUsado(vector<int> tour, Instancia ins){
     int t = 0;
     tour.push_back(0);
     tour.insert(tour.begin(),0);
-    for (int i=0;i<(tour.size()-1);i++){
+    for (int i=0;i<(int)(tour.size()-1);i++){
         curr = tour[i];
         next = tour[i+1];
         t += ins.adj[curr][next];
@@ -244,12 +244,12 @@ int main(){
         solucion<<mejor.aptitud<<endl;
         solucion<<usuario.T<<" "<<tiempo<<endl;
         solucion<<"1 ";
-        for (int i=0;i<mejor.cromosoma.size();i++){
+        for (int i=0;i<(int)mejor.cromosoma.size();i++){
             solucion<<mejor.cromosoma[i]+1<<" ";
         }
         solucion<<"1"<<endl;
         cout<<"Mejor tour con valoracion de "<<mejor.aptitud<<endl;
-        for (int i=0;i<mejor.cromosoma.size();i++){
+        for (int i=0;i<(int)mejor.cromosoma.size();i++){
             cout<<mejor.cromosoma[i]<<" ";
         }
         cout<<endl;
