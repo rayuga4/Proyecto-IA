@@ -5,6 +5,9 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <random>
+#include <algorithm>
+#include <chrono>
 
 using namespace std;
 
@@ -23,6 +26,7 @@ struct Usuario {
 
 struct Individuo {
     int aptitud;
+    bool evaluado;
     vector<int> cromosoma;
 };
 
@@ -41,6 +45,28 @@ void printArray(vector<vector<int>> arr, int n, int m){
     }
 }
 
+Individuo generarIndAleatorio(int n, float prob = 0.6, int leng = -1){
+    mt19937 rng;
+    rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
+    Individuo ind;
+    if (leng == -1){
+        while (ind.cromosoma.size()==0){
+            for (int i = 1;i<n;i++){
+            uniform_real_distribution<float> dist(0.0,1.0);
+                if (dist(rng)<prob){
+                    ind.cromosoma.push_back(i);
+                }
+            }
+        }
+        shuffle(ind.cromosoma.begin(),ind.cromosoma.end(),rng);
+    }
+    return ind;
+}
+
+Individuo cruce(Individuo p1, Individuo p2){
+
+}
+
 int eval(Individuo ind, Instancia ins, Usuario us, int gen){
     int curr;
     int next;
@@ -48,9 +74,12 @@ int eval(Individuo ind, Instancia ins, Usuario us, int gen){
     int t = 0;
     bool factibilidad = true;
     int pen = max(gen/50,10)*1500+1000;
-    for (int i=0;i<(ind.cromosoma.size()-1);i++){
-        curr = ind.cromosoma[i];
-        next = ind.cromosoma[i+1];
+    vector<int> tour = ind.cromosoma;
+    tour.push_back(0);
+    tour.insert(tour.begin(),0);
+    for (int i=0;i<(tour.size()-1);i++){
+        curr = tour[i];
+        next = tour[i+1];
         t += ins.adj[curr][next];
         if (t<ins.td[next][0]){
             t = ins.td[next][0];
@@ -73,12 +102,57 @@ int eval(Individuo ind, Instancia ins, Usuario us, int gen){
     }
 }
 
-int solve(Instancia instancia, Usuario usuario){
+Individuo solve(Instancia instancia, Usuario usuario){
     cout<<"Matriz de adyacencia"<<endl;
     printArray(instancia.adj,instancia.n,instancia.n);
     cout<<"Matriz de preferencia"<<endl;
     printArray(usuario.c,instancia.n,instancia.n);
-    return 0;
+    Poblacion pob;
+    pob.mejorAptitud = 0;
+    for (int i=0;i<100;i++){
+        Individuo ind;
+        if (i<25){
+            ind = generarIndAleatorio(instancia.n,0.4);
+        } else if (i<50){
+            ind = generarIndAleatorio(instancia.n,0.5);
+        } else if (i<75){
+            ind = generarIndAleatorio(instancia.n);
+        } else {
+            ind = generarIndAleatorio(instancia.n,0.7);
+        }
+        ind.aptitud = eval(ind,instancia,usuario,0);
+        if (ind.aptitud>pob.mejorAptitud){
+            pob.mejorAptitud = ind.aptitud;
+            pob.mejorCromosoma = ind.cromosoma;
+        }
+        ind.evaluado = true;
+        pob.poblacion.push_back(ind);
+    }
+    Individuo mejor;
+    mejor.aptitud = pob.mejorAptitud;
+    mejor.cromosoma = pob.mejorCromosoma;
+    return mejor;
+}
+
+int tiempoUsado(vector<int> tour, Instancia ins){
+    int curr;
+    int next;
+    int t = 0;
+    tour.push_back(0);
+    tour.insert(tour.begin(),0);
+    for (int i=0;i<(tour.size()-1);i++){
+        curr = tour[i];
+        next = tour[i+1];
+        t += ins.adj[curr][next];
+        if (t<ins.td[next][0]){
+            t = ins.td[next][0];
+        }
+//        if ((t+ins.t[next])>ins.td[next][1]){
+//            return -1;
+//        }
+        t += ins.t[next];
+    }
+    return t;
 }
 
 int main(){
@@ -92,15 +166,13 @@ int main(){
     cin >> m;
     stringstream ss;
     ss << "Instancias/nodos/" << n << "_instancia_" << m << ".txt";
-    string fname;
-    fname = ss.str();
+    string fname = ss.str();
     int u;
     cout << "Ingrese numero de usuarios" << endl;
     cin >> u;
     stringstream ss2;
     ss2 << "Instancias/usuarios/" << n << "_instancia_" << m << "_" << u << "us.txt"; 
-    string fname2;
-    fname2 = ss2.str();
+    string fname2 = ss2.str();
     cout << fname << endl << fname2 << endl;
 
     // Lectura de nodos
@@ -134,6 +206,10 @@ int main(){
     Instancia instancia = {n,t,td,adj};
 
     // Lectura y procesamiento de usuarios
+    stringstream ss3;
+    ss3<<"sol_"<<n<<"_"<<m<<".txt";
+    string fname3 = ss3.str();
+    ofstream solucion(fname3);
     ifstream usuarioF(fname2);
     getline(usuarioF,aux);
     for (int i = 0;i<u;i++){
@@ -159,7 +235,23 @@ int main(){
             }
         }
         Usuario usuario = {T, s, c};
-        solve(instancia, usuario);
-
+        Individuo mejor = solve(instancia, usuario);
+        int tiempo = tiempoUsado(mejor.cromosoma,instancia);
+        if (tiempo==-1||tiempo>usuario.T){
+            cout<<"Error"<<endl;
+            continue;
+        }
+        solucion<<mejor.aptitud<<endl;
+        solucion<<usuario.T<<" "<<tiempo<<endl;
+        solucion<<"1 ";
+        for (int i=0;i<mejor.cromosoma.size();i++){
+            solucion<<mejor.cromosoma[i]+1<<" ";
+        }
+        solucion<<"1"<<endl;
+        cout<<"Mejor tour con valoracion de "<<mejor.aptitud<<endl;
+        for (int i=0;i<mejor.cromosoma.size();i++){
+            cout<<mejor.cromosoma[i]<<" ";
+        }
+        cout<<endl;
     }
 }
