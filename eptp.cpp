@@ -30,6 +30,9 @@ struct Individuo {
     int aptitud;
     bool evaluado;
     vector<int> cromosoma;
+    bool operator > (const Individuo& a) const {
+        return (aptitud>a.aptitud);
+    }
 };
 
 struct Poblacion {
@@ -133,6 +136,9 @@ Individuo mutacion(Individuo ind){
     uniform_int_distribution<int> dis(0,ind.cromosoma.size()-1);
     int a = dis(rng);
     int b = dis(rng);
+    while (b==a){
+        b = dis(rng);
+    }
     reverse(ind.cromosoma.begin()+min(a,b),ind.cromosoma.begin()+max(a,b));
     ind.evaluado = false;
     return ind;
@@ -187,13 +193,19 @@ vector<int> selPoblacion(Poblacion pob, int total){
     return seleccionados;
 }
 
-Poblacion transformacion(Poblacion pob, int total, float pc = 0.8, float pm = 0.1){
-    vector<int> padres = selPoblacion(pob, total);
+Poblacion transformacion(Poblacion pob, int total, float pc = 0.9, float pm = 0.3){
+    sort(pob.poblacion.begin(),pob.poblacion.end(),greater<Individuo>());
+    vector<Individuo> elite;
+    int elites = (int)total*0.2;
+    for (int i = 0;i<elites;i++){
+        elite.push_back(pob.poblacion[i]);
+    }
+    vector<int> padres = selPoblacion(pob, total-elites);
     Poblacion nueva;
     mt19937 rng;
     rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
     uniform_real_distribution<float> dis(0.0,1.0);
-    for (int i=0;i<(int)total/2;i++){
+    for (int i=0;i<(int)(total-elites)/2;i++){
         float r = dis(rng);
         Individuo a = pob.poblacion[padres[i*2]];
         Individuo b = pob.poblacion[padres[i*2+1]];
@@ -205,11 +217,14 @@ Poblacion transformacion(Poblacion pob, int total, float pc = 0.8, float pm = 0.
             nueva.poblacion.push_back(b);
         }
     }
-    for (int i = 0;i<total;i++){
+    for (int i = 0;i<(total-elites);i++){
         float r = dis(rng);
         if (r<=pm){
             nueva.poblacion[i] = mutacion(nueva.poblacion[i]);
         }
+    }
+    for (Individuo ind:elite){
+        nueva.poblacion.push_back(ind);
     }
     return nueva;
 }
@@ -285,7 +300,7 @@ Individuo solve(Instancia instancia, Usuario usuario){
     int maxL = min(instancia.n,ultimoFactible+1);
     
     int total = 100;
-    int maxInt = 5000;
+    int maxInt = 1000;
     int intentos = 0;
     while ((int)pob.poblacion.size()<total&&intentos<maxInt){
         Individuo ind;
@@ -313,8 +328,10 @@ Individuo solve(Instancia instancia, Usuario usuario){
         ind.evaluado = true;
         pob.poblacion.push_back(ind);
     }
+    int cont = 0;
     for (int i=0;i<100;i++){
         Poblacion nueva = transformacion(pob,total);
+        bool cambio = false;
         for (int j = 0;j<total;j++){
             if (nueva.poblacion[j].evaluado == false){
                 nueva.poblacion[j].aptitud = eval(nueva.poblacion[j],instancia,usuario,i);
@@ -322,8 +339,17 @@ Individuo solve(Instancia instancia, Usuario usuario){
                 if (nueva.poblacion[j].aptitud>pob.mejorAptitud){
                     pob.mejorAptitud = nueva.poblacion[j].aptitud;
                     pob.mejorCromosoma = nueva.poblacion[j].cromosoma;
+                    cambio = true;
                 }
             }
+        }
+        if (!cambio){
+            cont++;
+        } else {
+            cont = 0;
+        }
+        if (cont>9){
+            break;
         }
         pob.poblacion = nueva.poblacion;
     }
