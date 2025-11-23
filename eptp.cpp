@@ -10,6 +10,7 @@
 #include <chrono>
 #include <unordered_set>
 #include <iterator>
+#include <chrono>
 
 using namespace std;
 
@@ -434,6 +435,7 @@ int main(){
     ofstream solucion(fname3);
     ifstream usuarioF(fname2);
     getline(usuarioF,aux);
+    auto globStart = chrono::system_clock::now();
     for (int i = 0;i<u;i++){
         cout<<"Usuario "<<i<<endl;
         int T;
@@ -457,7 +459,10 @@ int main(){
             }
         }
         Usuario usuario = {T, s, c};
+        auto startTime = chrono::system_clock::now();
         Individuo mejor = solve(instancia, usuario);
+        auto endTime = chrono::system_clock::now();
+        auto gap = chrono::duration_cast<chrono::milliseconds>(endTime-startTime).count();
         int tiempo = tiempoUsado(mejor.cromosoma,instancia);
         if (tiempo==-1||tiempo>usuario.T){
             cout<<"Error"<<endl;
@@ -475,5 +480,9 @@ int main(){
             cout<<mejor.cromosoma[i]<<" ";
         }
         cout<<endl;
+        cout<<"Tiempo utilizado: "<<gap/1000.0<<"s"<<endl;
     }
+    auto globEnd = chrono::system_clock::now();
+    auto gap = chrono::duration_cast<chrono::milliseconds>(globEnd-globStart).count();
+    cout<<"Instancia resuelta en "<<gap/1000.0<<"s"<<endl;
 }
