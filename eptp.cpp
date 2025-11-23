@@ -485,4 +485,5 @@ int main(){
     auto globEnd = chrono::system_clock::now();
     auto gap = chrono::duration_cast<chrono::milliseconds>(globEnd-globStart).count();
     cout<<"Instancia resuelta en "<<gap/1000.0<<"s"<<endl;
+    cout<<"Tiempo promedio por usuario: "<<gap/1000.0/u<<"s"<<endl;
 }
