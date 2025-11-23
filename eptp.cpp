@@ -8,6 +8,8 @@
 #include <random>
 #include <algorithm>
 #include <chrono>
+#include <unordered_set>
+#include <iterator>
 
 using namespace std;
 
@@ -59,12 +61,157 @@ Individuo generarIndAleatorio(int n, float prob = 0.6, int leng = -1){
             }
         }
         shuffle(ind.cromosoma.begin(),ind.cromosoma.end(),rng);
+    } else {
+        vector<int> available(n-1);
+        iota(available.begin(),available.end(),1);
+        shuffle(available.begin(),available.end(),rng);
+        ind.cromosoma = vector<int>(available.begin(),available.begin()+leng);
     }
     return ind;
 }
 
 Individuo cruce(Individuo p1, Individuo p2){
+    int l1 = p1.cromosoma.size();
+    int l2 = p2.cromosoma.size();
+    int lenMin = min(l1,l2);
+    int lenMax = max(l1,l2);
+    uniform_int_distribution<int> lenDist(lenMin,lenMax);
+    mt19937 rng;
+    rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
+    int target = lenMax;
+    int hijo[target] = {0};
+    uniform_int_distribution<int> pos(0,l1);
+    int a = pos(rng);
+    int b = pos(rng);
+    unordered_set<int> usado;
+    for (int i = min(a,b);i<max(a,b);i++){
+        hijo[i] = p1.cromosoma[i];
+        usado.insert(hijo[i]);
+    }
+    int currPos = 0;
+    if (currPos == min(a,b)){
+        currPos = max(a,b);
+    }
+    for (int nodo:p2.cromosoma){
+        if (currPos == target-1){
+            break;
+        }
+        if (usado.find(nodo)==usado.end()){
+            hijo[currPos] = nodo;
+            currPos+=1;
+            if (currPos == min(a,b)){
+                currPos = max(a,b);
+            }
+            usado.insert(nodo);
+        }
+    }
+    if (currPos<target-1){
+        for (int nodo:p1.cromosoma){
+            if (currPos == target-1){
+                break;
+            }
+            if (usado.find(nodo)==usado.end()){
+                hijo[currPos] = nodo;
+                currPos+=1;
+                if (currPos == min(a,b)){
+                    currPos = max(a,b);
+                }
+                usado.insert(nodo);
+            }
+        }
+    }
+    vector<int> hijoVec(hijo,hijo+sizeof(hijo)/sizeof(hijo[0]));
+    Individuo aux;
+    aux.cromosoma = hijoVec;
+    aux.evaluado = false;
+    return aux;
+}
 
+Individuo mutacion(Individuo ind){
+    mt19937 rng;
+    rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
+    uniform_int_distribution<int> dis(0,ind.cromosoma.size()-1);
+    int a = dis(rng);
+    int b = dis(rng);
+    reverse(ind.cromosoma.begin()+min(a,b),ind.cromosoma.begin()+max(a,b));
+    ind.evaluado = false;
+    return ind;
+}
+
+vector<float> pesoRuleta(vector<Individuo> pob){
+    vector<float> probs;
+    vector<Individuo> auxPob = pob;
+    float suma = 0.0;
+    int aux = pob.size();
+    int minFit = 1000000;
+    for (int i=0;i<aux;i++){
+        if (pob[i].aptitud<minFit){
+            minFit = pob[i].aptitud;
+        }
+    }
+    if (minFit<0){
+        for (int i=0;i<aux;i++){
+            pob[i].aptitud = pob[i].aptitud-minFit+500;
+        }
+    }
+    for (int i=0;i<aux;i++){
+        suma+=pob[i].aptitud;
+    }
+    for (int i=0;i<aux;i++){
+        probs.push_back(pob[i].aptitud/suma);
+    }
+    return probs;
+}
+
+vector<int> selPoblacion(Poblacion pob, int total){
+    vector<int> seleccionados;
+    vector<float> probs = pesoRuleta(pob.poblacion);
+    vector<float> probAcumulado;
+    float acumulado = 0.0;
+    for (float prob: probs){
+        acumulado+=prob;
+        probAcumulado.push_back(acumulado);
+    }
+    mt19937 rng;
+    rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
+    uniform_real_distribution<float> dis(0.0,acumulado);
+    for (int i=0;i<total;i++){
+        float r = dis(rng);
+        for (int j=0;j<(int)probAcumulado.size();j++){
+            if (r<=probAcumulado[j]){
+                seleccionados.push_back(j);
+                break;
+            }
+        }
+    }
+    return seleccionados;
+}
+
+Poblacion transformacion(Poblacion pob, int total, float pc = 0.8, float pm = 0.1){
+    vector<int> padres = selPoblacion(pob, total);
+    Poblacion nueva;
+    mt19937 rng;
+    rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
+    uniform_real_distribution<float> dis(0.0,1.0);
+    for (int i=0;i<(int)total/2;i++){
+        float r = dis(rng);
+        Individuo a = pob.poblacion[padres[i*2]];
+        Individuo b = pob.poblacion[padres[i*2+1]];
+        if (r<=pc){
+            nueva.poblacion.push_back(cruce(a,b));
+            nueva.poblacion.push_back(cruce(b,a));
+        } else {
+            nueva.poblacion.push_back(a);
+            nueva.poblacion.push_back(b);
+        }
+    }
+    for (int i = 0;i<total;i++){
+        float r = dis(rng);
+        if (r<=pm){
+            nueva.poblacion[i] = mutacion(nueva.poblacion[i]);
+        }
+    }
+    return nueva;
 }
 
 int eval(Individuo ind, Instancia ins, Usuario us, int gen){
@@ -73,7 +220,7 @@ int eval(Individuo ind, Instancia ins, Usuario us, int gen){
     int val = 0;
     int t = 0;
     bool factibilidad = true;
-    int pen = max(gen/50,10)*1500+1000;
+    int pen = min(gen/10,10)*750+500;
     vector<int> tour = ind.cromosoma;
     tour.push_back(0);
     tour.insert(tour.begin(),0);
@@ -103,23 +250,61 @@ int eval(Individuo ind, Instancia ins, Usuario us, int gen){
 }
 
 Individuo solve(Instancia instancia, Usuario usuario){
-    cout<<"Matriz de adyacencia"<<endl;
+    /*cout<<"Matriz de adyacencia"<<endl;
     printArray(instancia.adj,instancia.n,instancia.n);
     cout<<"Matriz de preferencia"<<endl;
-    printArray(usuario.c,instancia.n,instancia.n);
+    printArray(usuario.c,instancia.n,instancia.n);*/
     Poblacion pob;
     pob.mejorAptitud = 0;
-    for (int i=0;i<100;i++){
-        Individuo ind;
-        if (i<25){
-            ind = generarIndAleatorio(instancia.n,0.4);
-        } else if (i<50){
-            ind = generarIndAleatorio(instancia.n,0.5);
-        } else if (i<75){
-            ind = generarIndAleatorio(instancia.n);
-        } else {
-            ind = generarIndAleatorio(instancia.n,0.7);
+    int tamMuestra = 1000;
+    int ultimoFactible = 0;
+    for (int longitud=1;longitud<instancia.n;longitud++){
+        if (longitud>instancia.n*0.8){
+            break;
         }
+        int factibles = 0;
+        for (int i =0;i<tamMuestra;i++){
+            Individuo ind = generarIndAleatorio(instancia.n,0,longitud);
+            ind.aptitud = eval(ind,instancia,usuario,0);
+            if (ind.aptitud>0){
+                factibles++;
+                if (ind.aptitud>pob.mejorAptitud){
+                    pob.mejorAptitud = ind.aptitud;
+                    pob.mejorCromosoma = ind.cromosoma;
+                }
+            }
+        }
+        cout<<"Longitud "<<longitud<<": "<<factibles<<" factible"<<endl;
+        if (factibles>0){
+            ultimoFactible = longitud;
+        } else {
+            break;
+        }
+    }
+    int minL = max(1,ultimoFactible-1);
+    int maxL = min(instancia.n,ultimoFactible+1);
+    
+    int total = 100;
+    int maxInt = 5000;
+    int intentos = 0;
+    while ((int)pob.poblacion.size()<total&&intentos<maxInt){
+        Individuo ind;
+        int longitud = minL+ rand()%(maxL-minL+1);
+        ind = generarIndAleatorio(instancia.n,0.6,longitud);
+        ind.aptitud = eval(ind,instancia,usuario,0);
+        if (ind.aptitud>0){
+            if (ind.aptitud>pob.mejorAptitud){
+                pob.mejorAptitud = ind.aptitud;
+                pob.mejorCromosoma = ind.cromosoma;
+            }
+            ind.evaluado = true;
+            pob.poblacion.push_back(ind);
+        }
+    }
+    while ((int)pob.poblacion.size()<total){
+        Individuo ind;
+        int longitud = minL+ rand()%(maxL-minL+1);
+        ind = generarIndAleatorio(instancia.n,0.6,longitud);
         ind.aptitud = eval(ind,instancia,usuario,0);
         if (ind.aptitud>pob.mejorAptitud){
             pob.mejorAptitud = ind.aptitud;
@@ -127,6 +312,20 @@ Individuo solve(Instancia instancia, Usuario usuario){
         }
         ind.evaluado = true;
         pob.poblacion.push_back(ind);
+    }
+    for (int i=0;i<100;i++){
+        Poblacion nueva = transformacion(pob,total);
+        for (int j = 0;j<total;j++){
+            if (nueva.poblacion[j].evaluado == false){
+                nueva.poblacion[j].aptitud = eval(nueva.poblacion[j],instancia,usuario,i);
+                nueva.poblacion[j].evaluado = true;
+                if (nueva.poblacion[j].aptitud>pob.mejorAptitud){
+                    pob.mejorAptitud = nueva.poblacion[j].aptitud;
+                    pob.mejorCromosoma = nueva.poblacion[j].cromosoma;
+                }
+            }
+        }
+        pob.poblacion = nueva.poblacion;
     }
     Individuo mejor;
     mejor.aptitud = pob.mejorAptitud;
@@ -147,9 +346,6 @@ int tiempoUsado(vector<int> tour, Instancia ins){
         if (t<ins.td[next][0]){
             t = ins.td[next][0];
         }
-//        if ((t+ins.t[next])>ins.td[next][1]){
-//            return -1;
-//        }
         t += ins.t[next];
     }
     return t;
