@@ -9,3 +9,4 @@ eptp.o: eptp.cpp
 	$(CC) $(CFLAGS) -c -o eptp.o eptp.cpp
 clean:
 	rm -f eptp eptp.o
+	rm -f *.txt
