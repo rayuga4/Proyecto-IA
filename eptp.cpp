@@ -42,6 +42,7 @@ struct Poblacion {
     int mejorAptitud;
 };
 
+//Función auxiliar para mostrar las matrices en el testeo
 void printArray(vector<vector<int>> arr, int n, int m){
     for (int i=0;i<n;i++){
         for (int j=0;j<m;j++){
@@ -51,6 +52,7 @@ void printArray(vector<vector<int>> arr, int n, int m){
     }
 }
 
+//Generacion de individuo aleatorio basado en probabilidad o longitud
 Individuo generarIndAleatorio(int n, float prob = 0.6, int leng = -1){
     mt19937 rng;
     rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -74,6 +76,7 @@ Individuo generarIndAleatorio(int n, float prob = 0.6, int leng = -1){
     return ind;
 }
 
+//Order crossover con una longitud resultante entre la longitud de los 2 padres
 Individuo cruce(Individuo p1, Individuo p2){
     int l1 = p1.cromosoma.size();
     int l2 = p2.cromosoma.size();
@@ -131,6 +134,7 @@ Individuo cruce(Individuo p1, Individuo p2){
     return aux;
 }
 
+//Mutación invirtiendo un segmento aleatorio no nulo
 Individuo mutacion(Individuo ind){
     mt19937 rng;
     rng.seed(chrono::high_resolution_clock::now().time_since_epoch().count());
@@ -145,6 +149,7 @@ Individuo mutacion(Individuo ind){
     return ind;
 }
 
+//Calcula los pesos de cada individuo basado en su aptitud, aplicando un offset para que no hayan valores negativos
 vector<float> pesoRuleta(vector<Individuo> pob){
     vector<float> probs;
     vector<Individuo> auxPob = pob;
@@ -170,6 +175,7 @@ vector<float> pesoRuleta(vector<Individuo> pob){
     return probs;
 }
 
+//Seleccion por ruleta de la poblacion dada
 vector<int> selPoblacion(Poblacion pob, int total){
     vector<int> seleccionados;
     vector<float> probs = pesoRuleta(pob.poblacion);
@@ -194,6 +200,7 @@ vector<int> selPoblacion(Poblacion pob, int total){
     return seleccionados;
 }
 
+//Realiza la transformacion de la poblacion conservando una porcion de esta basado en elitismo
 Poblacion transformacion(Poblacion pob, int total, float pc = 0.9, float pm = 0.3){
     sort(pob.poblacion.begin(),pob.poblacion.end(),greater<Individuo>());
     vector<Individuo> elite;
@@ -230,6 +237,7 @@ Poblacion transformacion(Poblacion pob, int total, float pc = 0.9, float pm = 0.
     return nueva;
 }
 
+//Realiza la simulacion del tour, calculando la aptitud del individuo correspondiente
 int eval(Individuo ind, Instancia ins, Usuario us, int gen){
     int curr;
     int next;
@@ -266,12 +274,9 @@ int eval(Individuo ind, Instancia ins, Usuario us, int gen){
 }
 
 Individuo solve(Instancia instancia, Usuario usuario){
-    /*cout<<"Matriz de adyacencia"<<endl;
-    printArray(instancia.adj,instancia.n,instancia.n);
-    cout<<"Matriz de preferencia"<<endl;
-    printArray(usuario.c,instancia.n,instancia.n);*/
     Poblacion pob;
     pob.mejorAptitud = 0;
+    // Analiza la factibilidad de cada longitud para encontrar la mayor longitud viable
     int tamMuestra = 1000;
     int ultimoFactible = 0;
     for (int longitud=1;longitud<instancia.n;longitud++){
@@ -297,9 +302,12 @@ Individuo solve(Instancia instancia, Usuario usuario){
             break;
         }
     }
+
+    // Establece el rango de longitudes a generar basado en el analisis anterior
     int minL = max(1,ultimoFactible-1);
     int maxL = min(instancia.n,ultimoFactible+1);
     
+    //Generación de la poblacion inicial priorizando generar individuos factibles hasta alcanzar cierta cantidad de intentos o la población deseada
     int total = 100;
     int maxInt = 1000;
     int intentos = 0;
@@ -329,6 +337,8 @@ Individuo solve(Instancia instancia, Usuario usuario){
         ind.evaluado = true;
         pob.poblacion.push_back(ind);
     }
+
+    //Se ejecuta las transformaciones correspondientes a cada generación
     int cont = 0;
     for (int i=0;i<100;i++){
         Poblacion nueva = transformacion(pob,total);
